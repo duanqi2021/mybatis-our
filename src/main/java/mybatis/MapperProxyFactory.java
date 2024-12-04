@@ -35,7 +35,8 @@ public class MapperProxyFactory {
     }
     public static <T,S> T getMapper(Class<T> mapper,Class<S> domain,Connection connection)
     {
-        Object instance = Proxy.newProxyInstance(ClassLoader.getSystemClassLoader(), new Class[]{mapper}, (Object proxy, Method method, Object[] args)-> {
+        Object instance = Proxy.newProxyInstance(ClassLoader.getSystemClassLoader(), new Class[]{mapper},
+                (Object proxy, Method method, Object[] args)-> {
           //解析sql---执行sql----结果封装
             boolean hasSelect = method.isAnnotationPresent(Select.class);
             boolean hasUpdate = method.isAnnotationPresent(Update.class);
@@ -55,17 +56,26 @@ public class MapperProxyFactory {
                         // 获取字段名称
                         String fieldName = field.getName();
                         Class<?> fieldType = field.getType();
-                        // 根据字段名称获取对应的set方法
-                        Method setMethod = domain.getMethod("set" + fieldName, fieldType);
-                        final String re = resultSet.getString(fieldName);
+                        //判断是否有DataName注解
+                        // 否则根据字段名称获取对应的set方法
+                        //字段名称首字母大写
+                        Method setMethod = domain.getMethod("set" + capitalizeFirstLetter(fieldName), fieldType);
+                        String re="";
+                        if(field.isAnnotationPresent(DataName.class)){
+                            re = resultSet.getString(field.getAnnotation(DataName.class).value());
+                        }else{
+                            re = resultSet.getString(fieldName);
+                        }
                         try{
                             Method valueOfMethod = fieldType.getMethod("valueOf", String.class);
                             setMethod.invoke(s,valueOfMethod.invoke(null, re) );
                         }catch (Exception e){
                             setMethod.invoke(s,re );
                         }
-                        //final Object reValue = Class.forName(fieldType.getName()).cast(re);
-                        // 通过反射机制调用set方法，将resultSet对应字段的值赋值给User对象的对应字段
+                            //final Object reValue = Class.forName(fieldType.getName()).cast(re);
+                            // 通过反射机制调用set方法，将resultSet对应字段的值赋值给User对象的对应字段
+
+
                     }
 
                     list.add(s);
@@ -94,6 +104,23 @@ public class MapperProxyFactory {
 
 
     }
+
+    public static String capitalizeFirstLetter(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;  // 如果字符串为空或null，直接返回原字符串
+        }
+
+        // 获取第一个字符并转换为大写
+        char firstChar = Character.toUpperCase(str.charAt(0));
+
+        // 如果字符串只有一个字符，直接返回大写后的字符
+        if (str.length() == 1) {
+            return String.valueOf(firstChar);
+        }
+
+        // 将大写后的第一个字符与剩余部分连接起来
+        return firstChar + str.substring(1);
+    }
     private static ResultSet getResultSet(Method method, Object[] args, Connection connection, String value) throws SQLException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         Parameter[] parameterTypes = method.getParameters();
         Map<String,Object> paramMap=new HashMap<>();
@@ -112,7 +139,13 @@ public class MapperProxyFactory {
                     if (!fields[j].getName().equalsIgnoreCase("serialVersionUID")) {
                         fields[j].setAccessible(true); // 设置可访问性，以便访问私有属性
                         Object o=fields[j].get(args[i]);
-                        paramMap.put(value1+"."+fields[j].getName(),o);
+                        //判断是否有注解DataName 如果有的话 通过注解映射对应Map
+                        if(fields[j].isAnnotationPresent(DataName.class)){
+                            String value2 = fields[j].getAnnotation(DataName.class).value();
+                            paramMap.put(value1+"."+value2,o);
+                        }else{
+                            paramMap.put(value1+"."+fields[j].getName(),o);
+                        }
                         //paramMap.put("args"+(j+index), o);
 
                     }
@@ -144,7 +177,7 @@ public class MapperProxyFactory {
     public static Connection getConnection(String ip,String datasource, String user, String password) {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            String url="jdbc:mysql://"+ip+":3306/"+datasource+"?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8";
+            String url="jdbc:mysql://"+ip+":3306/"+datasource+"?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8";
             Connection connection= DriverManager.getConnection(url,user,password);
             return  connection;
         } catch (SQLException | ClassNotFoundException throwables) {

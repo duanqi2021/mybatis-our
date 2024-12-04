@@ -14,8 +14,14 @@ public class MyApplication {
     public static void main(String[] args) throws SQLException {
         Connection connection=MapperProxyFactory.getConnection("127.0.0.1","shop","root","duanqi1998");
         ProductMapper productMapper=MapperProxyFactory.getMapper(ProductMapper.class, Product.class,connection);
+    //   Product product=new Product();
+      //  product.setId(23);
+//        product.setName("测试1");
+//        product.setPrice(7.1);
+//
+//        productMapper.insertProduct(product);
+
         final List<Product> productList = productMapper.getProductList("4");
-//       final Integer test = productMapper.updateProductById("1", "测试123");
         System.out.println(productList);
 //        System.out.println(test);
  //       System.out.println(productMapper.deleteProductById("1"));
